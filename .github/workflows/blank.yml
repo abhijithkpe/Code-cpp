@@ -1,0 +1,350 @@
+
+// UDPSocketConnector.h
+//UDP connector class header file
+
+#pragma once
+#include "stdafx.h"
+#include <iostream>
+#include <WS2tcpIp.h>
+
+#ifdef UDPCONNECTOR_API_EXPORTS  
+#define UDPCONNECTOR_API __declspec(dllexport)   
+#else  
+#define UDPCONNECTOR_API __declspec(dllimport)   
+#endif  
+typedef void (*DataHandlerProc)( unsigned char*, unsigned long ); 
+#define BUF_SIZE  1000
+
+class  UDPCONNECTOR_API UDPCommunicator
+{
+public:
+	UDPCommunicator(void);
+	~UDPCommunicator(void);
+	static bool InitSocketCom();
+	static bool CloseSocketCom();
+	bool SetUDPParameters( char* pSrc_ip_addr,char* pDest_ip_addr,
+		unsigned short nDest_port_number,unsigned short nBind_port_number,unsigned short nCom_type);
+	bool InitUDPCom();
+	bool CloseEthernetCom();
+	signed long WriteData( char* pBuf,unsigned short nSize_of_buf );
+	signed long WaitForData( unsigned long timeout, DataHandlerProc data_handler_proc, unsigned short priority );
+	static void DataWaitingThread( LPVOID lparam );
+
+private:
+	unsigned short  m_DestPortNumber,m_BindPortNumber;
+	signed long m_ComType;
+	char m_DestIpAddr[16];
+	char m_SrcIpAddr[16];
+	SOCKET m_SocketId;
+	ADDRINFO* mp_HostAddr;
+	ADDRINFO* mp_DestAddr;
+	HANDLE m_DataWaitThread;
+	DataHandlerProc m_DataHandlerProc;
+	struct timeval m_Timeout;
+	DWORD m_DataWaitThreadId;
+	unsigned char m_DataBuf[BUF_SIZE];
+};
+
+
+
+
+
+// UDPSocketConnector.cpp
+//implementation for UDP connector class for socket communication
+#include "StdAfx.h"
+#include "UDPSocketConnector.h"
+
+UDPCommunicator::UDPCommunicator(void)
+{
+	m_SocketId = INVALID_SOCKET;
+	mp_HostAddr = NULL;
+	mp_DestAddr = NULL;
+	ZeroMemory(m_DestIpAddr,sizeof(m_DestIpAddr));
+	m_DestPortNumber = 0U;
+	m_BindPortNumber = 0U;
+	m_ComType = 0U;
+	m_DataHandlerProc = NULL;
+	m_DataWaitThread = NULL;
+	m_DataWaitThreadId = 0U;
+	ZeroMemory(&m_Timeout, sizeof(m_Timeout));
+	ZeroMemory(m_DataBuf, sizeof(m_DataBuf));
+}
+
+
+UDPCommunicator::~UDPCommunicator(void)
+{
+}
+
+bool UDPCommunicator::InitSocketCom()
+{
+	// Initiate Socket Communication
+	WSADATA	WSAData = { 0 };
+	const WORD M_WSA_VERSION = MAKEWORD( 2,0 );
+	if ( 0 != WSAStartup( M_WSA_VERSION, &WSAData ) )
+	{
+		// Tell the user that we could not find a usable
+		// WinSock DLL.
+		if ( LOBYTE( WSAData.wVersion ) != LOBYTE( M_WSA_VERSION ) ||
+			 HIBYTE( WSAData.wVersion ) != HIBYTE( M_WSA_VERSION ) )
+		{
+			 //Incorrect version of WS2_32.dll found
+			OutputDebugString( _T( "Incorrect version of tcp.dll found" ));
+		}
+		WSACleanup();
+		return FALSE;
+	}
+	else
+	{
+		return TRUE;
+	}
+}
+
+
+bool UDPCommunicator::CloseSocketCom()
+{
+	if(SOCKET_ERROR == WSACleanup())
+	{
+		OutputDebugString( _T( "Unable to Cleanup WSA\n" ));
+		return FALSE;
+	}
+	return TRUE;
+}
+
+
+bool UDPCommunicator::SetUDPParameters( char* pSrc_ip_addr_i,char* pDestn_ip_addr,
+		unsigned short nDest_port_number,unsigned short nBind_port_number,unsigned short nCom_type )
+{
+	if( NULL == pDestn_ip_addr )
+	{
+		return FALSE;
+	}
+	memcpy_s(m_DestIpAddr,sizeof( m_DestIpAddr ),pDestn_ip_addr,sizeof( m_DestIpAddr ));
+	if( NULL != pSrc_ip_addr_i )
+	{
+		memcpy_s( m_SrcIpAddr, sizeof( m_SrcIpAddr ), pSrc_ip_addr_i, sizeof( m_SrcIpAddr ));
+	}
+	else
+	{
+		m_SrcIpAddr[0] = '\0';
+	}
+	
+	m_DestPortNumber = nDest_port_number;
+	m_BindPortNumber = nBind_port_number;
+	m_ComType = nCom_type;
+	
+	return TRUE;
+}
+
+
+bool UDPCommunicator::InitUDPCom()
+{
+	signed long lError;
+	char s_port_No[25];
+	ADDRINFO Hints_st;
+	/* Open a datagram socket */
+	m_SocketId = socket( AF_INET, m_ComType/*SOCK_DGRAM*/, 0 );
+	if( m_SocketId == INVALID_SOCKET )
+	{
+		// Could not create socket.		
+		return FALSE;
+	}
+
+	memset( &Hints_st, 0, sizeof( Hints_st ));
+	Hints_st.ai_family = AF_INET;
+	Hints_st.ai_socktype = m_ComType;
+    Hints_st.ai_flags = AI_NUMERICHOST | AI_PASSIVE;
+	_itoa_s( m_DestPortNumber, s_port_No,sizeof( s_port_No ), 10 );
+    lError = getaddrinfo( m_DestIpAddr, s_port_No, &Hints_st, &mp_DestAddr );
+	if( lError != 0) {
+		OutputDebugString( _T( "Error (%d): Cannot resolve host address(%s)\n", WSAGetLastError(), m_DestIpAddr ));
+		CloseEthernetCom();
+		return FALSE;
+    }	
+	/*
+	memset( &Hints_st, 0, sizeof( Hints_st ));
+    Hints_st.ai_family = AF_INET;
+	Hints_st.ai_socktype = m_ComType;
+    Hints_st.ai_flags = AI_NUMERICHOST | AI_PASSIVE;
+	_itoa_s( m_BindPortNumber,s_port_No, sizeof( s_port_No ), 10 );
+	if( strcmp( "", m_SrcIpAddr ))
+	{
+		lError = getaddrinfo( m_SrcIpAddr, s_port_No, &Hints_st, &mp_HostAddr );
+	}
+	else
+	{
+		lError = getaddrinfo(NULL, s_port_No, &Hints_st, &mp_HostAddr);
+	}
+    if( lError != 0) {
+		printf( "Error (%d): Cannot resolve destination address\n", WSAGetLastError());
+		CloseEthernetCom();
+		return FALSE;
+    }
+
+	lError = ::bind( m_SocketId, mp_HostAddr->ai_addr, (INT)mp_HostAddr->ai_addrlen );
+	if( lError == INVALID_SOCKET) 
+	{
+		printf( "Error: unable to bind socket (%d)\n", WSAGetLastError() );
+		lError = shutdown( m_SocketId, SD_BOTH );
+		if ( lError == INVALID_SOCKET) 
+		{
+			printf( "shutdown of listen socket(%d) failed - %d", m_SocketId, WSAGetLastError() );
+		} 
+		CloseEthernetCom();
+		return FALSE;
+	}
+*/
+	return TRUE;
+}
+
+
+bool UDPCommunicator::CloseEthernetCom()
+{
+	
+	if( INVALID_SOCKET != m_SocketId )
+	{
+		if( INVALID_SOCKET == closesocket(m_SocketId))
+		{
+			return FALSE;
+		}
+		else
+		{
+			m_SocketId = INVALID_SOCKET;
+		}
+	}
+
+	if( NULL != mp_DestAddr )
+	{
+		freeaddrinfo( mp_DestAddr );
+		mp_DestAddr = NULL;
+	}
+
+	if( NULL != mp_HostAddr )
+	{
+		freeaddrinfo( mp_HostAddr );
+		mp_HostAddr = NULL;
+	}
+
+	if( NULL != m_DataWaitThread)
+	{
+		if( CloseHandle( m_DataWaitThread ))
+		{
+			m_DataWaitThread = NULL;			
+		}
+		else
+		{
+			return FALSE;
+		}
+	}
+	return TRUE;
+}
+
+
+signed long UDPCommunicator::WriteData( char* pBuf,unsigned short nSize_of_buf )
+{
+	const unsigned short ONE_CONST = 1U;
+	if( INVALID_SOCKET == m_SocketId)
+	{
+		OutputDebugString( _T( "CEthernetCom: Socket not yet created\n" ));
+		return (-( ONE_CONST ));		
+	}
+
+	unsigned short bytes_wrote;
+	bytes_wrote = sendto( m_SocketId, (char *)pBuf, nSize_of_buf, NULL, mp_DestAddr->ai_addr, (INT)mp_DestAddr->ai_addrlen );
+
+	if( SOCKET_ERROR != bytes_wrote )
+	{
+		return bytes_wrote;
+	}
+
+	return (-( ONE_CONST ));
+}
+
+
+signed long UDPCommunicator::WaitForData( unsigned long nTimeout, DataHandlerProc Data_handler_proc, unsigned short nPriority )
+{
+	const unsigned short ONETHOUSAND = 1000U;
+	if( INVALID_SOCKET == m_SocketId )
+	{
+		OutputDebugString( _T( "CEthernetCom: Socket not yet created\n" ));
+		return FALSE;
+	}
+	m_DataHandlerProc = Data_handler_proc;
+	
+	m_Timeout.tv_sec = nTimeout / ONETHOUSAND; // Extract the seconds
+	m_Timeout.tv_usec =( nTimeout % ONETHOUSAND ) * ONETHOUSAND; // and microseconds of the timeout
+	
+	/*create a thread to monoitor the port*/
+	m_DataWaitThread = CreateThread( NULL, 0, (LPTHREAD_START_ROUTINE)DataWaitingThread,this, CREATE_SUSPENDED, &m_DataWaitThreadId );
+	if( NULL ==m_DataWaitThread )
+	{
+
+		OutputDebugString( _T( "Unable to create data waiting thread\n" ));
+		return FALSE;
+	}
+	else
+	{
+		SetThreadPriority(m_DataWaitThread, nPriority);
+		ResumeThread( m_DataWaitThread );
+	}
+
+	return TRUE;
+}
+
+void UDPCommunicator::DataWaitingThread( LPVOID lparam )
+{
+	UDPCommunicator *p_ethrcom = (UDPCommunicator *) lparam;
+	struct timeval *p_timeval = NULL;
+	fd_set fd_Set;
+	signed long error_code;
+	signed long bytes_read;
+	signed long size_of_addr = static_cast<signed long>( p_ethrcom->mp_DestAddr->ai_addrlen );
+
+	// Clear file descriptor set
+	FD_ZERO(&fd_Set);
+	// Set the bit for network socket 'dataSock' in the descriptor set
+	FD_SET(p_ethrcom->m_SocketId, &fd_Set);
+	const int ZERO = 0;
+	const unsigned short ONETHOUSAND = 1000U;
+	if( ZERO != 
+		( p_ethrcom->m_Timeout.tv_sec * ONETHOUSAND + p_ethrcom->m_Timeout.tv_usec/ONETHOUSAND ))
+	{
+		p_timeval = &p_ethrcom->m_Timeout;
+	}
+	else
+	{
+		p_timeval = NULL; /*wait for infinite time*/
+	}
+	
+	while( INVALID_SOCKET != p_ethrcom->m_SocketId )
+	{
+		error_code = 1;
+	   // Block until data is available on this socket, or iTimeOut milliseconds has passed
+	   //error_code = select((INT)(p_ethrcom->m_SocketId + 1), &fd_Set, NULL, NULL, NULL);
+		if( error_code <= ZERO )
+		{
+			OutputDebugString( _T( "CEthernetCom: Error waiting for data / time out occured\n" ));
+		}
+		else
+		{			
+			//bytes_read = recv(m_SocketId,(T_CHAR *)p_buf,size_of_buf,NULL);
+			bytes_read = recvfrom( p_ethrcom->m_SocketId,
+				reinterpret_cast<char*>(p_ethrcom->m_DataBuf),BUF_SIZE,NULL,
+				p_ethrcom->mp_DestAddr->ai_addr,(INT*) &size_of_addr );
+
+			
+			if( SOCKET_ERROR == bytes_read )
+			{
+				if( WSAESHUTDOWN == GetLastError() )
+				{
+					break;
+				}
+			}
+			else
+			{
+				p_ethrcom->m_DataHandlerProc( p_ethrcom->m_DataBuf, bytes_read );
+			}
+		}
+	}	
+
+	ExitThread(0);	/*RP*/
+}
