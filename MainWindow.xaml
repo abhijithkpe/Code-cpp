@@ -1,0 +1,69 @@
+﻿<Window x:Class="VideoPlayer_sample_wpf.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="SamplevideoPlayer" Height="310" Width="525" Background="Chocolate" FontWeight="Bold" FontFamily="Calibri" >
+    
+    <Grid Height="269" Width="513">
+        <Grid.Background>
+            <ImageBrush ImageSource="D:\background.jpg"/>
+        </Grid.Background>
+
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="19*" />
+            <ColumnDefinition Width="101*" />
+            <ColumnDefinition Width="0*" />
+            <ColumnDefinition Width="115*" />
+            <ColumnDefinition Width="42*" />
+            <ColumnDefinition Width="11*" />
+            <ColumnDefinition Width="223*" />
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="0*" />
+        </Grid.ColumnDefinitions>
+        
+        <MediaElement Height="206" HorizontalAlignment="Left" Name="VideoPlayer" VerticalAlignment="Top" Width="514" Margin="0,22,0,0"  
+                        MediaEnded="OnMediaEnd" MediaOpened="Element_MediaOpened" Stretch="Fill" ScrubbingEnabled ="True"
+                      Source="C:\Users\abhijith.kp\Downloads\file_example_MP4_480_1_5MG.mp4" Grid.ColumnSpan="9" LoadedBehavior="Manual">
+        
+        </MediaElement>
+        <DockPanel Grid.ColumnSpan="9" Margin="0,0,-1,0">
+            <Menu DockPanel.Dock="Top" Height="20" HorizontalAlignment="Left" Name="menu1" VerticalAlignment="Top" Width="503" Grid.ColumnSpan="8" Margin="0,-1,0,0" >
+                <!--<MenuItem Width="70" Click="OnclickBrowse">--> <!--Header="_Browse"-->
+                <MenuItem Width="30" Height="20" Click="OnclickBrowse" >
+                        <!--<MenuItem.Background>
+                        <ImageBrush ImageSource="D:\images.jpg" Stretch="Fill" />
+                    </MenuItem.Background>-->
+                    <MenuItem.Icon>
+                        <Image Source="D:\brwse1.jpg" Width="20" Height="18"  />
+                </MenuItem.Icon>
+                
+                    <MenuItem.ToolTip>
+                        <ToolTip>Browse video files</ToolTip>
+                </MenuItem.ToolTip>
+            </MenuItem>
+                <!--<Separator />-->
+                <!--<MenuItem Header="_Exit" HorizontalAlignment="Right">
+                    <MenuItem.ToolTip>
+                    <ToolTip>Close the player</ToolTip>
+                </MenuItem.ToolTip>
+            </MenuItem>-->
+            </Menu>
+            
+        </DockPanel>
+        <Slider HorizontalAlignment ="Right" VerticalAlignment="Top" Height="17" Name="timelineSlider" Width="467"   
+                 Grid.ColumnSpan="6" Grid.Column="1" Margin="0,230,26,0" IsMoveToPointEnabled="True" Minimum="0" Maximum="100" Value="0" />
+        <Button  Height="15" HorizontalAlignment="Left" Margin="2,250,0,0" Name="button1" VerticalAlignment="Top" Width="30" Grid.ColumnSpan="2" Click="OnclickPlay">
+            <Image Source="D:\play1.jpg" ToolTip="Close" ToolTipService.HasDropShadow="True" Stretch="fill"></Image>
+         </Button>
+         <Button  Grid.Column="1" Height="15" HorizontalAlignment="Left" Margin="27,251,0,0" Name="button2" VerticalAlignment="Top" Width="29" Click="OnclickPause" >
+            <Image Source="D:\Pause.jpg" ToolTip="Close" ToolTipService.HasDropShadow="True" Stretch="fill"></Image>
+        </Button>
+        <Button  Grid.Column="1" Height="15" HorizontalAlignment="Left" Margin="72,251,0,0" Name="button3" VerticalAlignment="Top" Width="29" Click="OnclickStop" Grid.ColumnSpan="2">
+        <Image Source="D:\stop1.jpg" ToolTip="Close" ToolTipService.HasDropShadow="True" Stretch="fill"></Image>
+        </Button>
+        <Button  Name="button4" Margin="67,250,132,3" Grid.Column="6" Click="onclickVoiceControl" >
+            <Image Source="D:\voice.png" ToolTip="Close" ToolTipService.HasDropShadow="True" ></Image>
+        </Button>
+        <Slider HorizontalAlignment ="Right" VerticalAlignment="Bottom" Height="28" Name="volumeSlider" Width="98" Grid.Column="6" Margin="0,0,19,-6"
+                ValueChanged="ChangeMediaVolume"    Minimum="0" Maximum="1" Value="0"/>
+    </Grid>
+</Window>
