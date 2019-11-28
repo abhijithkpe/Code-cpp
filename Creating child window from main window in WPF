@@ -1,0 +1,57 @@
+//Creating child window from main window in WPF
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Data;
+using System.Windows.Documents;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows.Navigation;
+using System.Windows.Shapes;
+namespace WpfMultipage
+{
+    /// <summary>
+    /// Interaction logic for MainWindow.xaml
+    /// </summary>
+    public partial class MainWindow : Window
+    {
+        public MainWindow()
+        {
+            InitializeComponent();
+        }
+        private void Button_Click(object sender, RoutedEventArgs e)
+        {
+            var Window2 = new Window2();
+            Window2.ShowDialog();
+        }
+    }
+}
+
+
+//main window.xaml
+<Window x:Class="WpfMultipage.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="MainWindow" Height="350" Width="525">
+    <Grid>
+        <Button Content="Show child window" Height="23" HorizontalAlignment="Left" Margin="155,152,0,0" Name="button1" VerticalAlignment="Top" Width="157" Click="Button_Click">
+        </Button>
+    </Grid>
+</Window>
+
+
+//window2.xaml
+<Window x:Class="WpfMultipage.Window2"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Window2" Height="300" Width="300" WindowStartupLocation="CenterOwner">
+    <Grid>
+        <Label Content="Child Window" Height="49" HorizontalAlignment="Left" Margin="81,104,0,0" Name="label1" VerticalAlignment="Top" FontWeight="Bold" FontFamily="Calibri" FontStretch="Expanded" FontSize="20" Width="167" />
+    </Grid>
+</Window>
+
