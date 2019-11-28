@@ -1,0 +1,17 @@
+// Showing google map in the WPF Application.
+
+// MainWindow.xaml
+
+<Window x:Class="WPFTestApplication.InsertPushpin"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" 
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:m="clr-namespace:Microsoft.Maps.MapControl.WPF;assembly=Microsoft.Maps.MapControl.WPF"
+    Width="1024" Height="768">
+
+    <Grid x:Name="LayoutRoot" Background="White">
+        <m:Map CredentialsProvider="INSERT_YOUR_BING_MAPS_KEY" 
+               Center="47.620574,-122.34942" ZoomLevel="12">
+            <m:Pushpin Location="47.620574,-122.34942"/>
+        </m:Map>
+    </Grid>
+</Window>
