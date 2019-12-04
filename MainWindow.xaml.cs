@@ -10,151 +10,240 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
-using System.Windows.Shapes;
-using System.Windows.Threading;
+using System.IO;
+using System.Threading; 
+using System.Speech.Synthesis;
 
-namespace VideoPlayer_sample_wpf
+
+namespace Calendar_wpf
 {
     /// <summary>
     /// Interaction logic for MainWindow.xaml
     /// </summary>
     public partial class MainWindow : Window
     {
-        private Uri m_Filepath;
-        private TimeSpan TotalTime;
-        private DispatcherTimer timerVideoTime;
-        private bool bValue = false;
-        private bool bVoiceCtrlClicked = false;
-        private double MedaiaVolume = 0;
+        string m_sReadData;
+        Thread ReadTheHoliday;
+        string m_MonthName;
         public MainWindow()
         {
             InitializeComponent();
-            VideoPlayer.Volume = (double)volumeSlider.Value;
-            timelineSlider.AddHandler(MouseLeftButtonUpEvent,
-                      new MouseButtonEventHandler(timeSlider_MouseLeftButtonUp),
-                      true);
-        }
-        private void timeSlider_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
-        {
-            timerVideoTime.Stop();
-            if (TotalTime.TotalSeconds > 0)
+            for (int nIndex = 2019; nIndex < 2050; ++nIndex)
             {
-                VideoPlayer.Position = TimeSpan.FromSeconds(TotalTime.TotalSeconds / (100/timelineSlider.Value));
+                Year.Items.Add(nIndex);
             }
-            timerVideoTime.Start();
-        }
-
-
-        private void Element_MediaOpened(object sender, EventArgs e)
-        {
-            TotalTime = VideoPlayer.NaturalDuration.TimeSpan;
-
-            // Create a timer that will update the counters and the time slider
-            timerVideoTime = new DispatcherTimer();
-            timerVideoTime.Interval = TimeSpan.FromMilliseconds(1500);
-            timerVideoTime.Tick += new EventHandler(timer_Tick);
-            timerVideoTime.Start();
-        }
-        private void OnMediaEnd(object sender, EventArgs e)
-        {
-            VideoPlayer.Stop();
-            timelineSlider.Value = 0;
-        }
-        void timer_Tick(object sender, EventArgs e)
-        {
-            // Check if the movie finished calculate it's total time
-            if (VideoPlayer.NaturalDuration.TimeSpan.TotalSeconds > 0)
+            for (int nIndex = 1; nIndex < 13; ++nIndex)
             {
-                if (TotalTime.TotalSeconds > 0)
-                {
-                    // Updating time slider
-                    timelineSlider.Value = VideoPlayer.Position.TotalSeconds / TotalTime.TotalSeconds*100;
-                }
+                Month.Items.Add(nIndex);
             }
+            HolidayType.Items.Add("OPT");
+            HolidayType.Items.Add("HOL");
+            HolidayType.Items.Add("BOTH");
         }
-        private void OnclickPlay(object sender, RoutedEventArgs e)
-        {
-            // Create a timer that will update the counters and the time slider
-            bValue = true;
-            if( null != m_Filepath)
-            {
-                VideoPlayer.Source = m_Filepath;
-            }
-            VideoPlayer.Volume = 0.0;
-            volumeSlider.Value = 0.0;
-            m_Filepath = VideoPlayer.Source;
-            VideoPlayer.Play();
-            //VideoPlayer.Close();
-        }
-        private void OnclickPause(object sender, RoutedEventArgs e)
-        {
-            VideoPlayer.Pause();
-        }
-        private void OnclickStop(object sender, RoutedEventArgs e)
-        {
-            timerVideoTime.Stop();
-            VideoPlayer.Stop();
-            VideoPlayer.Source = null;
-            VideoPlayer.Volume = 0.0;
-            volumeSlider.Value = 0.0;
-            VideoPlayer.Close();
-            timelineSlider.Value = 0;
-        }
-        private void OnclickBrowse(object sender, RoutedEventArgs e)
-        {
-            if (bValue)
-            {
-                timerVideoTime.Stop();
-                int SliderValue = (int)timelineSlider.Value;
 
-                // Overloaded constructor takes the arguments days, hours, minutes, seconds, milliseconds.
-                // Create a TimeSpan with miliseconds equal to the slider value.
-                TimeSpan ts = new TimeSpan(0, 0, 0, 0, SliderValue);
-                VideoPlayer.Position = ts;
-
-            }
-            VideoPlayer.Volume = 0.0; 
-            Microsoft.Win32.OpenFileDialog openFileDlg = new Microsoft.Win32.OpenFileDialog();
-
-            // Launch OpenFileDialog by calling ShowDialog method
-            Nullable<bool> result = openFileDlg.ShowDialog();
-            // Get the selected file name and display in a TextBox.
-            // Load content of file in a TextBlock
-            if (result == true)
-            {
-                openFileDlg.DefaultExt = ".mp4";
-                openFileDlg.Multiselect = false;   
-                openFileDlg.Filter = "mp4files (*.mp4)|*.mp4|3gpfiles (*.3gp)|*.3gp";
-                string filename = openFileDlg.FileName;
-                m_Filepath = new Uri(filename);
-                VideoPlayer.Source = m_Filepath;
-                VideoPlayer.Play();
-
-            }
-        }
-        private void ChangeMediaVolume(object sender, RoutedPropertyChangedEventArgs<double> args)
+        //private void DisplayInListBox()
+        //{
+        //    DisplayBox.Items.Add(m_sReadData);
+        //}
+        private void DisplayInListBox(string strReadData)
         {
-            VideoPlayer.Volume = (double)volumeSlider.Value;
-        }
-        private void onclickVoiceControl(object sender, RoutedEventArgs e)
-        {
-            if (false == bVoiceCtrlClicked)
+            if (Application.Current.Dispatcher.CheckAccess())
             {
-                MedaiaVolume = VideoPlayer.Volume;
-                VideoPlayer.Volume = 0;
-                Image img = new Image();
-                img.Source = new BitmapImage(new Uri(@"D:\voice diabled.png"));
-                button4.Content = img;
-                bVoiceCtrlClicked = true;
+                DisplayBox.Items.Add(strReadData);
             }
             else
             {
-                VideoPlayer.Volume = MedaiaVolume;
-                Image img = new Image();
-                img.Source = new BitmapImage(new Uri(@"D:\voice.png"));
-                button4.Content = img;
-                bVoiceCtrlClicked = false;
+                Application.Current.Dispatcher.BeginInvoke(
+                  System.Windows.Threading.DispatcherPriority.Background,
+                  new Action(() =>
+                  {
+                      this.DisplayBox.Items.Add(strReadData);
+                  }));
             }
+        }
+        private void VoiceOutput(string strReadData)
+        {
+            SpeechSynthesizer synthesizer = new SpeechSynthesizer();
+            synthesizer.Volume = 100;  // 0...100
+            synthesizer.Rate = -3;     // -10...10
+            synthesizer.SelectVoiceByHints(VoiceGender.Female);
+            // Synchronous
+            //synthesizer.Speak("Hello World");
+            synthesizer.Speak(strReadData);
+            //// Asynchronous
+            //synthesizer.SpeakAsync("Hello World");
+        }
+        private void ReadFile(string strfilepath, string strHolidayType)
+        {
+            // the path of the file
+            // strfilepath = "D:\\friendinfo.txt";
+            FileStream inFile = new FileStream(strfilepath, FileMode.Open, FileAccess.Read);
+            StreamReader reader = new StreamReader(inFile);
+            //Thread thread = new Thread(DisplayInListBox);
+            //Thread thread2 = new Thread(VoiceOutput);
+            string sReadData;
+            // string sReadDataMonthWise;
+
+            try
+            {
+                //the program reads the record and displays it on the screen
+                sReadData = reader.ReadLine();
+                while ( sReadData != null)
+                {
+                    if ( "BOTH" == strHolidayType)
+                    {
+                        sReadData = sReadData.Substring(sReadData.IndexOf(':') + 1);
+                        DisplayInListBox(sReadData);
+                        VoiceOutput(sReadData);
+                    }
+                    else if( sReadData.Contains(strHolidayType))
+                    {
+                        sReadData = sReadData.Substring(sReadData.IndexOf(':') + 1);
+                        //sReadDataMonthWise = sReadData.Substring(sReadData.IndexOf('-') + 1);
+                        //sReadDataMonthWise = sReadDataMonthWise.Substring(0,sReadDataMonthWise.IndexOf('-'));
+                        if (sReadData.Contains(m_MonthName))
+                        {
+                            //MessageBox.Show(sReadDataMonthWise);
+                            //MessageBox.Show(sReadData);
+                            DisplayInListBox(sReadData);
+                            VoiceOutput(sReadData);
+                        }
+                    }
+                    sReadData = reader.ReadLine();
+                }
+            }
+            finally
+            {
+                //after the record is done being read, the progam closes
+                reader.Close();
+                inFile.Close();
+                if( ReadTheHoliday.IsAlive )
+                {
+
+                    ReadTheHoliday.Abort();
+                }
+            }
+        }
+
+        private void ReadTheTextFile(string strPath, string strHolidayType)
+        {
+            switch (strHolidayType)
+            {
+                case "OPT":
+                    {
+                        DisplayBox.Items.Add("Displaying the Optional Holidays");
+                        break;
+                    }
+                case "HOL":
+                    {
+                        //ReadFile(strPath, "H");
+                        DisplayBox.Items.Add("Displaying the Holidays");
+                        break;
+                    }
+                case "BOTH":
+                    {
+                        //ReadFile(strPath, "H");
+                        DisplayBox.Items.Add("Displaying the Holidays");
+                        break;
+                    }
+                default:
+                    break;
+            }
+            ReadTheHoliday = new Thread(() => ReadFile(strPath, strHolidayType));
+            ReadTheHoliday.Start();
+        }
+
+
+        private void OnClickSay(object sender, RoutedEventArgs e)
+        {
+            DisplayBox.Items.Clear();
+            if( null == Year.SelectedValue | null == Month.SelectedValue | null == HolidayType.SelectedValue )
+            {
+                Window myMessageBox = new Window();
+                myMessageBox.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+                myMessageBox.Show();
+                //MessageBox.Show(this, "Please enetr valid inputs");
+                return;
+            }
+            string sYear  = Year.SelectedItem.ToString();
+            sYear += ".txt";
+            string sMonth = Month.SelectedItem.ToString();
+            string sHolidayType = HolidayType.SelectedItem.ToString();
+            var path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,sYear);
+            //string path = "D:\\temp\\" + sYear + ".txt";
+            int nMonth = Int32.Parse(sMonth);
+            switch( nMonth )
+            {
+                case 1:
+                    {
+                        m_MonthName = "Jan";
+                        break;
+                    }
+                case 2:
+                    {
+                        m_MonthName = "Feb";
+                        break;
+                    }
+                case 3:
+                    {
+                        m_MonthName = "Mar";
+                        break;
+                    }
+                case 4:
+                    {
+                        m_MonthName = "Apr";
+                        break;
+                    }
+                case 5:
+                    {
+                        m_MonthName = "May";
+                        break;
+                    }
+                case 6:
+                    {
+                        m_MonthName = "Jun";
+                        break;
+                    }
+                case 7:
+                    {
+                        m_MonthName = "Jul";
+                        break;
+                    }
+                case 8:
+                    {
+                        m_MonthName = "Aug";
+                        break;
+                    }
+                case 9:
+                    {
+                        m_MonthName = "Sep";
+                        break;
+                    }
+                case 10:
+                    {
+                        m_MonthName = "Oct";
+                        break;
+                    }
+                case 11:
+                    {
+                        m_MonthName = "Nov";
+                        break;
+                    }
+               case 12:
+                    {
+                        m_MonthName = "Dec";
+                        break;
+                    }
+
+                default:
+                    break;
+            }
+            if (File.Exists( path))
+            {
+                ReadTheTextFile(path, sHolidayType);
+
+            }
+            
         }
     }
 }
